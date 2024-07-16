@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+
 
 void main() {
   runApp(MyApp());
@@ -243,12 +245,19 @@ class ParkingScreen extends StatefulWidget {
 class _ParkingScreenState extends State<ParkingScreen> {
   int score = 0;
   bool parkingCompleted = false;
+  Timer? timer;
 
   @override
   void initState() {
     super.initState();
     fetchScore();
-    checkParkingStatus();
+    checkParkingStatusPeriodically();
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel(); // Timer'ı iptal et
+    super.dispose();
   }
 
   void fetchScore() async {
@@ -264,24 +273,6 @@ class _ParkingScreenState extends State<ParkingScreen> {
     }
   }
 
-  void completeParking() async {
-    final url = "http://${widget.baseUrl}:5000/park_complete";
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'status': 'complete'}),
-    );
-
-    if (response.statusCode == 200) {
-      print('Park işlemi tamamlandı');
-      setState(() {
-        parkingCompleted = true;
-      });
-    } else {
-      print('Park işlemi tamamlanamadı');
-    }
-  }
-
   void checkParkingStatus() async {
     final url = "http://${widget.baseUrl}:5000/get_park_complete";
     final response = await http.get(Uri.parse(url));
@@ -293,6 +284,15 @@ class _ParkingScreenState extends State<ParkingScreen> {
     } else {
       print('Park durumu alınamadı');
     }
+  }
+
+  void checkParkingStatusPeriodically() {
+    timer = Timer.periodic(Duration(seconds: 2), (timer) {
+      checkParkingStatus();
+      if (parkingCompleted) {
+        timer.cancel();
+      }
+    });
   }
 
   @override
@@ -311,7 +311,7 @@ class _ParkingScreenState extends State<ParkingScreen> {
                     onPressed: () {
                       Navigator.pop(context);
                     },
-                    child: const Text('Yeni Plaka Gir', style: TextStyle(fontSize: 20)),
+                    child: const Text('Plaka Girmeye Dön', style: TextStyle(fontSize: 20)),
                   ),
                 ],
               )
@@ -320,13 +320,6 @@ class _ParkingScreenState extends State<ParkingScreen> {
                 children: [
                   const Text('Park işlemi devam ediyor...', style: TextStyle(fontSize: 20)),
                   Text('Puan: $score', style: const TextStyle(fontSize: 30)),
-                  ElevatedButton(
-                    onPressed: () {
-                      completeParking();
-                      checkParkingStatus();
-                    },
-                    child: const Text('Park Durumunu Kontrol Et', style: TextStyle(fontSize: 20)),
-                  ),
                 ],
               ),
       ),
